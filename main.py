@@ -14,7 +14,7 @@ CHAT_ID = "1325489931"
 bot = Bot(token=TELEGRAM_TOKEN)
 
 def get_minute_data(symbol):
-    url = f"https://api.polygon.io/v2/aggs/ticker/{symbol}/range/1/minute/1/day?adjusted=true&sort=asc&limit=100&apiKey={POLYGON_API_KEY}"
+    url = f"https://api.polygon.io/v2/aggs/ticker/{symbol}/range/1/minute/1/day?adjusted=true&include_pre_post=true&sort=asc&limit=100&apiKey={POLYGON_API_KEY}"
     r = requests.get(url)
     if r.status_code != 200:
         return None
