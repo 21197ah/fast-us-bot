@@ -1,72 +1,67 @@
 import requests
+import pandas as pd
 import time
-from telegram import Bot
-from collections import defaultdict
 from datetime import datetime
+from telegram import Bot
 
-API_KEY = "d187oepr01ql1b4mbi1gd187oepr01ql1b4mbi20"
+# مفاتيح التشغيل
+POLYGON_API_KEY = "0hIZppRq0ddFHBD...Tgq7B"  # حط المفتاح الكامل هنا
 TELEGRAM_TOKEN = "8120887452:AAESsIpRAj4qLS_M09p5Ptrr870Ya99HLSs"
 CHAT_ID = "1325489931"
+
 bot = Bot(token=TELEGRAM_TOKEN)
 
-alert_counter = defaultdict(int)
+def format_alert(stock):
+    symbol = stock["ticker"]
+    last = stock["lastTrade"]["p"]
+    change = stock["todaysChangePerc"]
+    volume = stock["day"]["v"]
+    avg_volume = stock["day"]["av"]
+    rvol = round(volume / avg_volume, 2) if avg_volume else 0
+    market_cap = stock.get("marketCap", "N/A")
+    float_shares = stock.get("float", "N/A")
 
-def get_stock_data(symbol):
-    url = f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/{symbol}?apiKey={API_KEY}"
-    r = requests.get(url)
-    if r.status_code != 200:
-        return None
-    data = r.json().get("ticker", {})
-    if not data:
-        return None
+    alert_type = []
+    if rvol > 3: alert_type.append("RVOL عالي")
+    if change > 5: alert_type.append("زخم")
+    if last < 1: alert_type.append("تحت الدولار")
+    if 1 <= last < 20: alert_type.append("اختراق مقاومة")
 
-    price = data["lastTrade"]["p"]
-    volume = round(data["day"]["v"] / 1_000_000, 2)
-    rvol = round(data["metrics"]["relative_volume"], 2)
-    float_shares = round(data.get("shares_float", 0) / 1_000_000, 2)
-    return price, rvol, volume, float_shares
+    alert = (
+        "تنبيه سهم\n"
+        f"الرمز: ${symbol}\n"
+        f"السعر: {last}\n"
+        f"نسبة التغير: {change}%\n"
+        f"RVOL: {rvol}x\n"
+        f"الحجم: {volume}\n"
+        f"القيمة السوقية: {market_cap}\n"
+        f"عدد الأسهم الحرة: {float_shares}\n"
+        f"نوع التنبيه: {' + '.join(alert_type) if alert_type else 'غير محدد'}\n"
+        f"التاريخ: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+    )
+    return alert
 
-def send_alert(symbol, price, rvol, volume, float_shares, tests):
-    alert_counter[symbol] += 1
-    alert_num = alert_counter[symbol]
+def scan_stocks():
+    url = f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?apiKey={POLYGON_API_KEY}"
+    response = requests.get(url)
+    data = response.json()
 
-    message = f"""📡 تنبيه ({alert_num})
-
-📈 السهم: ${symbol}
-💵 السعر: {price}
-📊 RVOL اليومي: {rvol}x
-📦 حجم التداول: {volume}M
-🪶 الفلوت: {float_shares}M
-
-🧠 التحليل:
-▪️ فوليوم مرتفع بشكل مفاجئ
-▪️ السعر فوق VWAP
-▪️ تحرك سريع قد يكون بسبب زخم أو خبر
-
-⏰ الوقت: {datetime.now().strftime('%I:%M %p')}
-🔁 مرات اختبار المقاومة: {tests}
-"""
-    bot.send_message(chat_id=CHAT_ID, text=message)
-
-STOCKS = ["MARA", "RIOT", "COSM", "GME", "CVNA", "PLTR", "AMD", "SOFI"]
-
-while True:
-    for symbol in STOCKS:
+    tickers = data.get("tickers", [])
+    for stock in tickers:
         try:
-            data = get_stock_data(symbol)
-            if not data:
-                continue
-            price, rvol, volume, float_shares = data
-            resistance_tests = 2  # مؤقت، بيتم تحسينه لاحقاً
+            last = stock["lastTrade"]["p"]
+            change = stock["todaysChangePerc"]
+            volume = stock["day"]["v"]
+            avg_volume = stock["day"]["av"]
+            rvol = volume / avg_volume if avg_volume else 0
 
-            if price >= 100 or rvol < 2 or float_shares >= 20 or resistance_tests < 2:
-                continue
-
-            send_alert(symbol, price, rvol, volume, float_shares, resistance_tests)
-            time.sleep(1)
-
+            if last < 20 and rvol > 2 and change > 3:
+                alert_msg = format_alert(stock)
+                bot.send_message(chat_id=CHAT_ID, text=alert_msg)
         except Exception as e:
-            print(f"خطأ مع {symbol}: {e}")
-            continue
+            print(f"خطأ في {stock['ticker']}: {e}")
 
+# تشغيل كل دقيقة
+while True:
+    scan_stocks()
     time.sleep(60)
