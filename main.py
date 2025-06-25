@@ -7,7 +7,7 @@ from telegram import Bot
 # مفاتيح التشغيل
 TELEGRAM_TOKEN = "8120887452:AAESsIPRaj4qLS_M09p5Ptr870Ya99HLSs"
 CHAT_ID = 1325489931
-POLYGON_API_KEY = "F3HbS9dbxHrxY9P9yIb8F3HbS9dbxHrxY9P9yIb8"
+POLYGON_API_KEY = "w3SOv4x0pfi4JGnZXqSuU9qD8PaRloTa"
 
 bot = Bot(token=TELEGRAM_TOKEN)
 
